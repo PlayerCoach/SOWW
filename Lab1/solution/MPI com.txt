@@ -1,6 +1,6 @@
 mpicc app.c -o app
 
-mpirun --mca orte_keep_fqdn_hostnames t --mca btl_tcp_if_exclude docker0,docker_gwbridge,lo --machinefile .hostfile -np X .app
+mpirun --mca orte_keep_fqdn_hostnames t --mca btl_tcp_if_exclude docker0,docker_gwbridge,lo --machinefile .hostfile -np  .app
 
 
 gdzie X to liczba procesów a app.c to program z MPI.

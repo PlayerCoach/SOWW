@@ -10,11 +10,11 @@ ifeq (run,$(firstword $(MAKECMDGOALS)))
 endif
 
 
-main: mpi.c
-	${MPICC} ${CFLAGS} $< -o mpi ${LIBS}
+main: sample.c
+	${MPICC} ${CFLAGS} $< -o a.out ${LIBS}
 
 run:
-	mpirun -np 4 ./mpi $(RUN_ARGS)
+	mpirun -np 4 ./a.out $(RUN_ARGS) 
 
 clean:
-	rm mpi
+	rm -f a.out mpi

@@ -10,11 +10,12 @@ ifeq (run,$(firstword $(MAKECMDGOALS)))
 endif
 
 
-main: mpi.c
+main: sample.c
 	${MPICC} ${CFLAGS} $< -o mpi ${LIBS}
 
 run:
-	mpirun -np 4 ./mpi $(RUN_ARGS)
+  mpirun --mca orte_keep_fqdn_hostnames t --mca btl_tcp_if_exclude docker0,docker_gwbridge,lo --machinefile .hostfile -np 2 ./mpi
+  # mpirun -np 4 ./mpi $(RUN_ARGS)
 
 clean:
 	rm mpi

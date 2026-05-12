@@ -6,8 +6,8 @@ PROCS?=4
 FILE?=arr0.csv
 
 ifeq (run,$(firstword $(MAKECMDGOALS)))
-	RUN_ARGS := $(wordlist 2,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))
-	$(eval $(RUN_ARGS):;@:)
+RUN_ARGS := $(wordlist 2,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))
+$(eval $(RUN_ARGS):;@:)
 endif
 
 NP_RUN := $(word 2,$(RUN_ARGS))

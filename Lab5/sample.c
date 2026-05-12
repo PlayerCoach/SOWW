@@ -146,8 +146,8 @@ int main(int argc, char **argv)
     int proccount;
     int threadsupport;
     int threads = THREADNUM;
+    int expected_procs = 0;
     int parse_ok = 1;
-    unsigned long requested_n = 0;
 
     unsigned long *values = NULL;
     unsigned long values_count = 0;
@@ -165,28 +165,17 @@ int main(int argc, char **argv)
 
     if (myrank == 0)
     {
-        if (argc < 2 || argc > 4)
+        if (argc != 4)
         {
-            printf("Usage: %s <csv_file> [n] [threads]\n", argv[0]);
+            printf("Usage: %s <threads> <processes> <csv_file>\n", argv[0]);
             parse_ok = 0;
         }
 
-        if (parse_ok && argc >= 3)
+        if (parse_ok)
         {
             char *endptr;
-            requested_n = strtoul(argv[2], &endptr, 10);
-            if (endptr == argv[2])
-            {
-                printf("Invalid n value\n");
-                parse_ok = 0;
-            }
-        }
-
-        if (parse_ok && argc == 4)
-        {
-            char *endptr;
-            long parsed_threads = strtol(argv[3], &endptr, 10);
-            if (endptr == argv[3] || parsed_threads <= 0)
+            long parsed_threads = strtol(argv[1], &endptr, 10);
+            if (endptr == argv[1] || parsed_threads <= 0)
             {
                 printf("Invalid threads value\n");
                 parse_ok = 0;
@@ -194,6 +183,26 @@ int main(int argc, char **argv)
             else
             {
                 threads = (int)parsed_threads;
+            }
+        }
+
+        if (parse_ok)
+        {
+            char *endptr;
+            long parsed_procs = strtol(argv[2], &endptr, 10);
+            if (endptr == argv[2] || parsed_procs <= 0)
+            {
+                printf("Invalid processes value\n");
+                parse_ok = 0;
+            }
+            else
+            {
+                expected_procs = (int)parsed_procs;
+                if (expected_procs != proccount)
+                {
+                    printf("Expected %d MPI processes, got %d\n", expected_procs, proccount);
+                    parse_ok = 0;
+                }
             }
         }
     }
@@ -205,14 +214,14 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    MPI_Bcast(&requested_n, 1, MPI_UNSIGNED_LONG, 0, MPI_COMM_WORLD);
     MPI_Bcast(&threads, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&expected_procs, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
     omp_set_num_threads(threads);
 
     if (myrank == 0)
     {
-        if (!read_csv_numbers(argv[1], &values, &values_count))
+        if (!read_csv_numbers(argv[3], &values, &values_count))
         {
             printf("Cannot read CSV file\n");
             values_count = 0;
@@ -222,9 +231,6 @@ int main(int argc, char **argv)
         {
             qsort(values, values_count, sizeof(unsigned long), compare_ulong);
             values_count = deduplicate_sorted(values, values_count);
-
-            if (requested_n > 0 && requested_n < values_count)
-                values_count = requested_n;
         }
     }
 
@@ -265,12 +271,7 @@ int main(int argc, char **argv)
     MPI_Reduce(&local_result, &total_result, 1, MPI_UNSIGNED_LONG, MPI_SUM, 0, MPI_COMM_WORLD);
 
     if (myrank == 0)
-    {
-        if (requested_n > 0)
-            printf("Twin primes in first %lu unique values: %lu\n", values_count, total_result);
-        else
-            printf("Twin primes in %lu unique values: %lu\n", values_count, total_result);
-    }
+        printf("Twin primes in %lu unique values: %lu\n", values_count, total_result);
 
     free(values);
     MPI_Finalize();

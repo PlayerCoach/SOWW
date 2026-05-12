@@ -5,6 +5,7 @@
 #include <string.h>
 
 #define DEFAULT_THREADS_PER_BLOCK 256
+#define MAX_THREADS_PER_BLOCK 1024
 
 static void errorexit(const char *message)
 {
@@ -162,19 +163,18 @@ int main(int argc, char **argv)
   unsigned long *values = NULL;
   unsigned long values_count = 0;
   unsigned long long result = 0;
-  int threads_per_block = DEFAULT_THREADS_PER_BLOCK;
+  int threads_per_block = 0;
 
-  if (argc < 2 || argc > 3)
+  if (argc != 3)
   {
-    printf("Usage: %s <csv_file> [threads_per_block]\n", argv[0]);
+    printf("Usage: %s <csv_file> <threads_per_block>\n", argv[0]);
     return 1;
   }
 
-  if (argc == 3)
   {
     char *endptr;
     long parsed_threads = strtol(argv[2], &endptr, 10);
-    if (endptr == argv[2] || parsed_threads <= 0 || parsed_threads > 1024)
+    if (endptr == argv[2] || parsed_threads <= 0 || parsed_threads > MAX_THREADS_PER_BLOCK)
     {
       printf("Invalid threads_per_block value\n");
       return 1;

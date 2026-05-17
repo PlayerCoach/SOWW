@@ -4,8 +4,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define THREADNUM 8
-
 static int compare_ulong(const void *left, const void *right)
 {
     unsigned long a = *(const unsigned long *)left;
@@ -119,10 +117,24 @@ static unsigned long deduplicate_sorted(unsigned long *values, unsigned long cou
     return unique_count;
 }
 
-static unsigned long count_twin_primes_range(const unsigned long *values,
-                                                                                         unsigned long count,
-                                                                                         unsigned long start,
-                                                                                         unsigned long end)
+static void compute_rank_range(unsigned long count,
+                               int rank,
+                               int process_count,
+                               unsigned long *out_start,
+                               unsigned long *out_end)
+{
+    unsigned long items_per_process = count / (unsigned long)process_count;
+    unsigned long remainder = count % (unsigned long)process_count;
+    unsigned long rank_index = (unsigned long)rank;
+
+    unsigned long start = rank_index * items_per_process + (rank_index < remainder ? rank_index : remainder);
+    unsigned long length = items_per_process + (unsigned long)(rank_index < remainder);
+
+    *out_start = start;
+    *out_end = start + length;
+}
+
+static unsigned long count_twin_primes_range(const unsigned long *values, unsigned long count, unsigned long start, unsigned long end)
 {
     if (end > count)
         end = count;
@@ -145,9 +157,8 @@ int main(int argc, char **argv)
     int myrank;
     int proccount;
     int threadsupport;
-    int threads = THREADNUM;
-    int expected_procs = 0;
-    int parse_ok = 1;
+    int threads;
+    int expected_procs;
 
     unsigned long *values = NULL;
     unsigned long values_count = 0;
@@ -168,54 +179,33 @@ int main(int argc, char **argv)
         if (argc != 4)
         {
             printf("Usage: %s <threads> <processes> <csv_file>\n", argv[0]);
-            parse_ok = 0;
+            MPI_Abort(MPI_COMM_WORLD, 1);
         }
 
-        if (parse_ok)
+        char *endptr;
+        long parsed_threads = strtol(argv[1], &endptr, 10);
+        if (endptr == argv[1] || parsed_threads <= 0)
         {
-            char *endptr;
-            long parsed_threads = strtol(argv[1], &endptr, 10);
-            if (endptr == argv[1] || parsed_threads <= 0)
-            {
-                printf("Invalid threads value\n");
-                parse_ok = 0;
-            }
-            else
-            {
-                threads = (int)parsed_threads;
-            }
+            printf("Invalid threads value\n");
+            MPI_Abort(MPI_COMM_WORLD, 1);
         }
+        threads = (int)parsed_threads;
 
-        if (parse_ok)
+        long parsed_procs = strtol(argv[2], &endptr, 10);
+        if (endptr == argv[2] || parsed_procs <= 0)
         {
-            char *endptr;
-            long parsed_procs = strtol(argv[2], &endptr, 10);
-            if (endptr == argv[2] || parsed_procs <= 0)
-            {
-                printf("Invalid processes value\n");
-                parse_ok = 0;
-            }
-            else
-            {
-                expected_procs = (int)parsed_procs;
-                if (expected_procs != proccount)
-                {
-                    printf("Expected %d MPI processes, got %d\n", expected_procs, proccount);
-                    parse_ok = 0;
-                }
-            }
+            printf("Invalid processes value\n");
+            MPI_Abort(MPI_COMM_WORLD, 1);
         }
-    }
-
-    MPI_Bcast(&parse_ok, 1, MPI_INT, 0, MPI_COMM_WORLD);
-    if (!parse_ok)
-    {
-        MPI_Finalize();
-        return 1;
+        expected_procs = (int)parsed_procs;
+        if (expected_procs != proccount)
+        {
+            printf("Expected %d MPI processes, got %d\n", expected_procs, proccount);
+            MPI_Abort(MPI_COMM_WORLD, 1);
+        }
     }
 
     MPI_Bcast(&threads, 1, MPI_INT, 0, MPI_COMM_WORLD);
-    MPI_Bcast(&expected_procs, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
     omp_set_num_threads(threads);
 
@@ -258,12 +248,9 @@ int main(int argc, char **argv)
 
     MPI_Bcast(values, values_count, MPI_UNSIGNED_LONG, 0, MPI_COMM_WORLD);
 
-    unsigned long base = values_count / (unsigned long)proccount;
-    unsigned long extra = values_count % (unsigned long)proccount;
-    unsigned long rank_ul = (unsigned long)myrank;
-    unsigned long start = rank_ul * base + (rank_ul < extra ? rank_ul : extra);
-    unsigned long length = base + (unsigned long)(rank_ul < extra);
-    unsigned long end = start + length;
+    unsigned long start = 0;
+    unsigned long end = 0;
+    compute_rank_range(values_count, myrank, proccount, &start, &end);
 
     unsigned long local_result = count_twin_primes_range(values, values_count, start, end);
     unsigned long total_result = 0;

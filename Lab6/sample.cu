@@ -4,7 +4,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define DEFAULT_THREADS_PER_BLOCK 256
 #define MAX_THREADS_PER_BLOCK 1024
 
 static void errorexit(const char *message)
